@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Pickle Dashboard 🥒</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,600;0,900;1,300;1,600&family=DM+Mono:wght@400;500&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --pickle: #4a7c3f;
+  --pickle-bright: #6abf5e;
+  --pickle-light: #a8d5a2;
+  --pickle-dark: #2d5a27;
+  --brine: #c8e6c4;
+  --brine-dark: #8ab88a;
+  --jar: #f5f0dc;
+  --jar-dark: #e8ddb5;
+  --dill: #d4edda;
+  --bg: #0e1a0d;
+  --bg2: #162414;
+  --bg3: #1e3019;
+  --card: #1a2e18;
+  --card2: #203820;
+  --border: #2d4a2a;
+  --border2: #3a5e36;
+  --text: #e8f5e5;
+  --text2: #8ab588;
+  --text3: #4a6e48;
+  --gold: #f0c040;
+  --red: #e05050;
+  --blue: #60a8d0;
+  --radius: 12px;
+  --font: 'Nunito', sans-serif;
+  --mono: 'DM Mono', monospace;
+  --display: 'Fraunces', serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; overflow-x: hidden; }
+
+/* NOISE TEXTURE */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0; opacity: 0.4;
+}
+
+/* PICKLE FLOATING BACKGROUND */
+.pickle-bg {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+}
+.pickle-bg span {
+  position: absolute; font-size: 2rem; opacity: 0.04;
+  animation: floatPickle linear infinite;
+}
+@keyframes floatPickle {
+  0% { transform: translateY(110vh) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.04; }
+  90% { opacity: 0.04; }
+  100% { transform: translateY(-10vh) rotate(360deg); opacity: 0; }
+}
+
+/* AUTH */
+.auth-page {
+  min-height: 100vh; display: none; align-items: center; justify-content: center;
+  position: relative; z-index: 1;
+  padding: 1.5rem;
+}
+.auth-page.active { display: flex; }
+
+/* SIGN IN — centered classic layout */
+#signin-screen {
+  background: radial-gradient(ellipse at 30% 40%, rgba(74,124,63,0.15) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 70%, rgba(106,191,94,0.08) 0%, transparent 50%);
+}
+#signin-screen .auth-wrap { width: 100%; max-width: 420px; }
+
+/* SIGN UP — two-column split layout */
+#signup-screen {
+  background: radial-gradient(ellipse at 70% 30%, rgba(74,124,63,0.18) 0%, transparent 55%),
+              radial-gradient(ellipse at 20% 80%, rgba(106,191,94,0.06) 0%, transparent 50%);
+  align-items: stretch;
+}
+.signup-split {
+  display: grid; grid-template-columns: 1fr 1fr;
+  width: 100%; max-width: 900px; min-height: 560px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 24px; overflow: hidden;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+  margin: auto;
+}
+.signup-left {
+  background: linear-gradient(145deg, var(--pickle-dark) 0%, #1a3d15 50%, #0e1a0d 100%);
+  padding: 3rem 2.5rem; display: flex; flex-direction: column; justify-content: space-between;
+  position: relative; overflow: hidden;
+}
+.signup-left::before {
+  content: '🥒';
+  position: absolute; font-size: 180px; opacity: 0.07;
+  right: -30px; bottom: -20px; line-height: 1;
+}
+.signup-left-logo {
+  font-family: var(--display); font-size: 26px; font-weight: 900;
+  color: var(--pickle-bright); display: flex; align-items: center; gap: 8px;
+}
+.signup-left-headline {
+  font-family: var(--display); font-size: 36px; font-weight: 900;
+  line-height: 1.15; color: var(--text);
+}
+.signup-left-headline em { color: var(--pickle-bright); font-style: normal; }
+.signup-perks { display: flex; flex-direction: column; gap: 14px; }
+.signup-perk { display: flex; align-items: flex-start; gap: 10px; }
+.signup-perk-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.signup-perk-text { font-size: 13px; color: var(--text2); line-height: 1.4; }
+.signup-perk-text strong { color: var(--text); font-weight: 700; display: block; }
+.signup-right { padding: 3rem 2.5rem; display: flex; flex-direction: column; justify-content: center; }
+.signup-right-title { font-family: var(--display); font-size: 28px; font-weight: 900; margin-bottom: 0.3rem; }
+.signup-right-sub { color: var(--text2); font-size: 13px; margin-bottom: 1.75rem; }
+.signup-back { display: inline-flex; align-items: center; gap: 5px; color: var(--text3); font-size: 12px; cursor: pointer; margin-bottom: 1.5rem; transition: color 0.15s; background: none; border: none; font-family: var(--font); padding: 0; }
+.signup-back:hover { color: var(--pickle-bright); }
+
+/* SHARED AUTH ELEMENTS */
+.auth-wrap { width: 100%; max-width: 420px; }
+.auth-logo {
+  text-align: center; margin-bottom: 2rem;
+  font-family: var(--display); font-size: 42px; font-weight: 900;
+  color: var(--pickle-bright); text-shadow: 0 0 40px rgba(106,191,94,0.4); letter-spacing: -1px;
+}
+.auth-logo span { font-size: 36px; }
+.auth-tagline { text-align: center; color: var(--text2); font-size: 13px; margin-top: -1rem; margin-bottom: 2rem; font-style: italic; }
+.auth-box {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 2.5rem;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(106,191,94,0.1);
+}
+.auth-title { font-family: var(--display); font-size: 24px; font-weight: 600; margin-bottom: 0.25rem; }
+.auth-sub { color: var(--text2); font-size: 13px; margin-bottom: 1.75rem; }
+.auth-label { font-size: 12px; color: var(--text2); margin-bottom: 5px; display: block; font-weight: 600; letter-spacing: 0.04em; }
+.auth-input {
+  width: 100%; padding: 11px 14px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 10px; color: var(--text); font-family: var(--font); font-size: 14px;
+  outline: none; transition: border-color 0.2s, box-shadow 0.2s; margin-bottom: 1rem;
+}
+.auth-input:focus { border-color: var(--pickle-bright); box-shadow: 0 0 0 3px rgba(106,191,94,0.15); }
+.auth-btn {
+  width: 100%; padding: 12px;
+  color: var(--text); border: none; border-radius: 10px;
+  font-family: var(--font); font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: all 0.2s; margin-top: 0.25rem;
+  background: linear-gradient(135deg, var(--pickle), var(--pickle-dark));
+  box-shadow: 0 4px 20px rgba(74,124,63,0.4);
+}
+.auth-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 25px rgba(74,124,63,0.5); }
+.auth-btn:active { transform: translateY(0); }
+.auth-toggle { margin-top: 1.25rem; text-align: center; font-size: 13px; color: var(--text2); }
+.auth-toggle span { color: var(--pickle-bright); cursor: pointer; font-weight: 700; }
+.auth-toggle span:hover { text-decoration: underline; }
+.auth-error {
+  background: rgba(224,80,80,0.1); border: 1px solid rgba(224,80,80,0.3);
+  color: var(--red); font-size: 13px; padding: 9px 12px; border-radius: 8px; margin-bottom: 1rem; display: none;
+}
+.auth-msg {
+  background: rgba(106,191,94,0.1); border: 1px solid rgba(106,191,94,0.3);
+  color: var(--pickle-bright); font-size: 13px; padding: 9px 12px; border-radius: 8px; margin-bottom: 1rem; display: none;
+}
+@media (max-width: 700px) {
+  .signup-split { grid-template-columns: 1fr; }
+  .signup-left { display: none; }
+  .signup-right { padding: 2rem 1.5rem; }
+}
+
+/* APP */
+#app-screen { display: none; min-height: 100vh; flex-direction: column; position: relative; z-index: 1; }
+
+/* TOPBAR */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.85rem 1.5rem;
+  background: rgba(14,26,13,0.85); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.topbar-logo {
+  font-family: var(--display); font-size: 22px; font-weight: 900;
+  color: var(--pickle-bright); letter-spacing: -0.5px; display: flex; align-items: center; gap: 6px;
+}
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.pickle-count {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 20px; padding: 5px 12px;
+  font-family: var(--mono); font-size: 13px; color: var(--pickle-bright); font-weight: 500;
+}
+.user-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 20px; padding: 5px 12px; font-size: 12px; color: var(--text2);
+}
+.signout-btn {
+  font-size: 12px; color: var(--text3); background: none;
+  border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px;
+  cursor: pointer; font-family: var(--font); transition: all 0.15s;
+}
+.signout-btn:hover { color: var(--red); border-color: var(--red); }
+
+/* MAIN */
+.main { flex: 1; padding: 1.5rem; max-width: 1300px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 1.25rem; }
+
+/* MODE SELECTOR */
+.mode-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.mode-bar-label { font-size: 11px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; margin-right: 4px; }
+.mode-btn {
+  padding: 7px 16px; border-radius: 20px; border: 1px solid var(--border2);
+  background: transparent; color: var(--text2); font-family: var(--font);
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; gap: 6px;
+}
+.mode-btn:hover { border-color: var(--pickle-bright); color: var(--pickle-bright); }
+.mode-btn.active { background: var(--pickle); color: white; border-color: var(--pickle); box-shadow: 0 0 15px rgba(74,124,63,0.3); }
+.mode-btn-add {
+  padding: 7px 14px; border-radius: 20px; border: 1px dashed var(--border2);
+  background: transparent; color: var(--text3); font-family: var(--font);
+  font-size: 12px; cursor: pointer; transition: all 0.2s;
+}
+.mode-btn-add:hover { border-color: var(--pickle-bright); color: var(--pickle-bright); }
+
+/* STATS ROW */
+.stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.stat-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.1rem 1.25rem;
+  position: relative; overflow: hidden;
+  transition: border-color 0.2s;
+}
+.stat-card:hover { border-color: var(--border2); }
+.stat-card::before {
+  content: attr(data-emoji);
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  font-size: 32px; opacity: 0.12;
+}
+.stat-label { font-size: 11px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.stat-value { font-size: 30px; font-weight: 800; color: var(--text); font-family: var(--display); }
+.stat-sub { font-size: 12px; color: var(--text3); margin-top: 3px; }
+.progress-bar { height: 3px; background: var(--bg3); border-radius: 2px; margin-top: 8px; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--pickle), var(--pickle-bright)); border-radius: 2px; transition: width 0.5s ease; }
+
+/* PANELS */
+.panels { display: grid; gap: 1.25rem; }
+.panels-2 { grid-template-columns: 360px 1fr; }
+.panels-1 { grid-template-columns: 1fr; }
+.panels-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+.panel {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.25rem;
+  display: flex; flex-direction: column; gap: 1rem;
+}
+.panel-header { display: flex; align-items: center; justify-content: space-between; }
+.panel-title { font-size: 11px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* TIMER */
+.timer-display {
+  font-size: 54px; font-family: var(--mono); font-weight: 500;
+  color: var(--pickle-bright); text-align: center; letter-spacing: 0.02em;
+  text-shadow: 0 0 30px rgba(106,191,94,0.3);
+  padding: 0.5rem 0;
+}
+.timer-running .timer-display { animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+.timer-label { text-align: center; font-size: 13px; color: var(--text2); min-height: 20px; font-style: italic; }
+
+/* INPUTS */
+.inp {
+  width: 100%; padding: 9px 12px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 8px; color: var(--text); font-family: var(--font); font-size: 13px;
+  outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+}
+.inp:focus { border-color: var(--pickle-bright); box-shadow: 0 0 0 2px rgba(106,191,94,0.1); }
+select.inp { cursor: pointer; }
+
+.btn-row { display: flex; gap: 8px; }
+.btn {
+  padding: 9px 16px; border-radius: 8px; border: 1px solid var(--border2);
+  background: var(--bg3); color: var(--text); font-family: var(--font);
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+}
+.btn:hover { background: var(--card2); border-color: var(--border2); }
+.btn.primary { background: linear-gradient(135deg, var(--pickle), var(--pickle-dark)); color: white; border-color: transparent; box-shadow: 0 2px 10px rgba(74,124,63,0.3); }
+.btn.primary:hover { box-shadow: 0 4px 15px rgba(74,124,63,0.4); transform: translateY(-1px); }
+.btn.running { background: linear-gradient(135deg, #b8860b, #8b6914); color: white; border-color: transparent; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: rgba(224,80,80,0.1); }
+.btn.flex1 { flex: 1; }
+
+/* LOG */
+.log-list { display: flex; flex-direction: column; max-height: 150px; overflow-y: auto; }
+.log-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text2);
+}
+.log-item:last-child { border-bottom: none; }
+.log-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-dur { font-family: var(--mono); color: var(--pickle-bright); font-size: 11px; margin-left: 8px; }
+.log-time { font-size: 10px; color: var(--text3); margin-left: 6px; }
+
+/* TASKS */
+.task-add-row { display: flex; gap: 8px; }
+.task-add-row input { flex: 1; }
+.filter-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.filt {
+  padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border2);
+  background: transparent; color: var(--text2); font-size: 11px; font-family: var(--font);
+  cursor: pointer; transition: all 0.15s; font-weight: 600;
+}
+.filt:hover { border-color: var(--pickle-bright); color: var(--pickle-bright); }
+.filt.active { background: var(--pickle); color: white; border-color: var(--pickle); }
+.task-list { display: flex; flex-direction: column; max-height: 380px; overflow-y: auto; }
+.task-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  animation: slideIn 0.2s ease;
+}
+@keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+.task-item:last-child { border-bottom: none; }
+.task-check {
+  width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border2);
+  cursor: pointer; flex-shrink: 0; margin-top: 1px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.task-check:hover { border-color: var(--pickle-bright); box-shadow: 0 0 8px rgba(106,191,94,0.3); }
+.task-check.done { background: var(--pickle); border-color: var(--pickle); }
+.task-check.done::after {
+  content: ''; width: 5px; height: 8px;
+  border-right: 2px solid white; border-bottom: 2px solid white;
+  transform: rotate(45deg) translateY(-1px); display: block;
+}
+.task-body { flex: 1; min-width: 0; }
+.task-text { font-size: 13px; color: var(--text); line-height: 1.4; font-weight: 600; }
+.task-text.done { text-decoration: line-through; color: var(--text3); font-weight: 400; }
+.task-meta { display: flex; gap: 6px; align-items: center; margin-top: 4px; flex-wrap: wrap; }
+.badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 700; font-family: var(--mono); }
+.badge-high { background: rgba(224,80,80,0.15); color: #e07070; }
+.badge-med { background: rgba(240,192,64,0.15); color: var(--gold); }
+.badge-low { background: rgba(106,191,94,0.12); color: var(--pickle-bright); }
+.badge-case { background: rgba(96,168,208,0.15); color: var(--blue); }
+.task-date { font-size: 10px; color: var(--text3); font-family: var(--mono); }
+.task-del { font-size: 12px; color: var(--text3); background: none; border: none; cursor: pointer; padding: 3px 6px; border-radius: 5px; transition: all 0.15s; flex-shrink: 0; }
+.task-del:hover { color: var(--red); background: rgba(224,80,80,0.08); }
+
+/* PICKLE ACHIEVEMENTS */
+.achievements-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.achievement {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px; text-align: center;
+  transition: all 0.2s; position: relative; overflow: hidden;
+}
+.achievement.unlocked { border-color: var(--pickle); background: rgba(74,124,63,0.1); }
+.achievement.unlocked::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 0%, rgba(106,191,94,0.1) 0%, transparent 70%); }
+.achievement-icon { font-size: 28px; margin-bottom: 6px; filter: grayscale(1) opacity(0.4); transition: filter 0.3s; }
+.achievement.unlocked .achievement-icon { filter: none; }
+.achievement-name { font-size: 11px; font-weight: 700; color: var(--text2); }
+.achievement.unlocked .achievement-name { color: var(--pickle-bright); }
+.achievement-desc { font-size: 10px; color: var(--text3); margin-top: 2px; }
+.achievement-pickles { font-size: 10px; color: var(--gold); margin-top: 4px; font-family: var(--mono); }
+
+/* FITNESS PANEL */
+.macro-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.macro-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; }
+.macro-val { font-size: 22px; font-weight: 800; font-family: var(--display); color: var(--text); }
+.macro-label { font-size: 10px; color: var(--text3); font-family: var(--mono); text-transform: uppercase; margin-top: 2px; }
+.macro-goal { font-size: 10px; color: var(--text3); }
+.workout-list { display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; }
+.workout-item {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; font-size: 13px;
+}
+.workout-item-left { display: flex; align-items: center; gap: 8px; }
+.workout-type { font-size: 18px; }
+.workout-name { font-weight: 700; color: var(--text); }
+.workout-meta { font-size: 11px; color: var(--text3); }
+.workout-del { font-size: 11px; color: var(--text3); background: none; border: none; cursor: pointer; padding: 2px 5px; border-radius: 4px; }
+.workout-del:hover { color: var(--red); }
+
+/* HABITS */
+.habit-list { display: flex; flex-direction: column; gap: 8px; }
+.habit-item {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+  transition: all 0.2s;
+}
+.habit-item.completed { border-color: var(--pickle); background: rgba(74,124,63,0.08); }
+.habit-check-btn {
+  width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border2);
+  background: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; transition: all 0.2s; flex-shrink: 0;
+}
+.habit-check-btn:hover { border-color: var(--pickle-bright); }
+.habit-check-btn.done { background: var(--pickle); border-color: var(--pickle); }
+.habit-name { flex: 1; font-size: 13px; font-weight: 700; }
+.habit-streak { font-family: var(--mono); font-size: 11px; color: var(--gold); }
+.habit-del { font-size: 11px; color: var(--text3); background: none; border: none; cursor: pointer; }
+.habit-del:hover { color: var(--red); }
+
+/* CUSTOM MODE BUILDER */
+.builder-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.widget-option {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px; cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.widget-option:hover { border-color: var(--pickle-bright); }
+.widget-option.selected { border-color: var(--pickle); background: rgba(74,124,63,0.1); }
+.widget-option-icon { font-size: 24px; margin-bottom: 6px; }
+.widget-option-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.widget-option-desc { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+/* TOAST / PICKLE POP */
+.pickle-toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 1000;
+  background: var(--card); border: 1px solid var(--pickle);
+  border-radius: 14px; padding: 14px 18px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4), 0 0 20px rgba(74,124,63,0.3);
+  transform: translateY(100px); opacity: 0;
+  transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  max-width: 320px;
+}
+.pickle-toast.show { transform: translateY(0); opacity: 1; }
+.toast-icon { font-size: 28px; }
+.toast-title { font-size: 14px; font-weight: 800; color: var(--pickle-bright); }
+.toast-msg { font-size: 12px; color: var(--text2); margin-top: 1px; }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+  z-index: 200; display: flex; align-items: center; justify-content: center; padding: 1rem;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--card); border: 1px solid var(--border2);
+  border-radius: 16px; padding: 2rem; width: 100%; max-width: 480px;
+  transform: scale(0.95); transition: transform 0.2s;
+}
+.modal-overlay.open .modal { transform: scale(1); }
+.modal-title { font-family: var(--display); font-size: 22px; font-weight: 600; margin-bottom: 0.5rem; }
+.modal-sub { color: var(--text2); font-size: 13px; margin-bottom: 1.5rem; }
+.modal-close { float: right; background: none; border: none; color: var(--text3); font-size: 18px; cursor: pointer; margin-top: -4px; }
+.modal-label { font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 5px; display: block; letter-spacing: 0.04em; }
+
+/* EMPTY + LOADING */
+.empty { text-align: center; padding: 2rem; color: var(--text3); font-size: 13px; }
+.empty-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.5; }
+.loading { text-align: center; padding: 1.5rem; color: var(--text3); font-size: 12px; font-family: var(--mono); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+  .panels-2 { grid-template-columns: 1fr; }
+  .panels-3 { grid-template-columns: 1fr; }
+  .stat-row { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .main { padding: 1rem; }
+  .topbar { padding: 0.75rem 1rem; }
+  .stat-row { grid-template-columns: 1fr 1fr; }
+  .timer-display { font-size: 40px; }
+  .user-pill { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- FLOATING PICKLES BG -->
+<div class="pickle-bg" id="pickle-bg"></div>
+
+<!-- TOAST -->
+<div class="pickle-toast" id="pickle-toast">
+  <div class="toast-icon" id="toast-icon">🥒</div>
+  <div>
+    <div class="toast-title" id="toast-title">Achievement Unlocked!</div>
+    <div class="toast-msg" id="toast-msg"></div>
+  </div>
+</div>
+
+<!-- CUSTOM MODE MODAL -->
+<div class="modal-overlay" id="custom-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeCustomModal()">✕</button>
+    <div class="modal-title">🥒 Build Your Mode</div>
+    <div class="modal-sub">Choose a name and pick your widgets</div>
+    <label class="modal-label">Mode Name</label>
+    <input class="inp" id="custom-mode-name" placeholder="e.g. My Study Grind" style="margin-bottom:1rem"/>
+    <label class="modal-label">Pick Widgets</label>
+    <div class="builder-grid" id="widget-grid"></div>
+    <div style="margin-top:1.25rem; display:flex; gap:8px;">
+      <button class="btn flex1" onclick="closeCustomModal()">Cancel</button>
+      <button class="btn primary flex1" onclick="saveCustomMode()">Create Mode 🥒</button>
+    </div>
+  </div>
+</div>
+
+<!-- SIGN IN SCREEN -->
+<div id="signin-screen" class="auth-page active">
+  <div class="auth-wrap">
+    <div class="auth-logo"><span>🥒</span> Pickle Dashboard</div>
+    <div class="auth-tagline">Your life. Tracked. In brine.</div>
+    <div class="auth-box">
+      <div class="auth-title">Welcome back</div>
+      <div class="auth-sub">Sign in to your dashboard</div>
+      <div class="auth-error" id="signin-error"></div>
+      <label class="auth-label">Email</label>
+      <input class="auth-input" type="email" id="signin-email" placeholder="you@example.com"/>
+      <label class="auth-label">Password</label>
+      <input class="auth-input" type="password" id="signin-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doSignIn()"/>
+      <button class="auth-btn" onclick="doSignIn()" id="signin-btn">Sign In 🥒</button>
+      <div class="auth-toggle">Don't have an account? <span onclick="goToSignUp()">Sign up</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- SIGN UP SCREEN -->
+<div id="signup-screen" class="auth-page">
+  <div class="signup-split">
+    <div class="signup-left">
+      <div class="signup-left-logo">🥒 Pickle Dashboard</div>
+      <div class="signup-left-headline">Track your life.<br/><em>Earn pickles.</em><br/>Stay in the brine.</div>
+      <div class="signup-perks">
+        <div class="signup-perk">
+          <div class="signup-perk-icon">💼</div>
+          <div class="signup-perk-text"><strong>Work Mode</strong>Time tracking, to-do lists, and case management</div>
+        </div>
+        <div class="signup-perk">
+          <div class="signup-perk-icon">💪</div>
+          <div class="signup-perk-text"><strong>Fitness Mode</strong>Log workouts, calories, and macros</div>
+        </div>
+        <div class="signup-perk">
+          <div class="signup-perk-icon">🌱</div>
+          <div class="signup-perk-text"><strong>Personal Mode</strong>Build habits, track streaks, and crush goals</div>
+        </div>
+        <div class="signup-perk">
+          <div class="signup-perk-icon">🏆</div>
+          <div class="signup-perk-text"><strong>Pickle Achievements</strong>Unlock badges and earn 🥒 pickles as you go</div>
+        </div>
+      </div>
+    </div>
+    <div class="signup-right">
+      <button class="signup-back" onclick="goToSignIn()">← Back to Sign In</button>
+      <div class="signup-right-title">Create your account</div>
+      <div class="signup-right-sub">Join the brine. It's free.</div>
+      <div class="auth-error" id="signup-error"></div>
+      <div class="auth-msg" id="signup-msg"></div>
+      <label class="auth-label">Email</label>
+      <input class="auth-input" type="email" id="signup-email" placeholder="you@example.com"/>
+      <label class="auth-label">Password</label>
+      <input class="auth-input" type="password" id="signup-password" placeholder="At least 6 characters"/>
+      <label class="auth-label">Confirm Password</label>
+      <input class="auth-input" type="password" id="signup-confirm" placeholder="Same as above" onkeydown="if(event.key==='Enter')doSignUp()"/>
+      <button class="auth-btn" onclick="doSignUp()" id="signup-btn">Create Account 🥒</button>
+      <div class="auth-toggle">Already have an account? <span onclick="goToSignIn()">Sign in</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP SCREEN -->
+<div id="app-screen">
+  <div class="topbar">
+    <div class="topbar-logo">🥒 Pickle Dashboard</div>
+    <div class="topbar-right">
+      <div class="pickle-count">🥒 <span id="pickle-count">0</span> pickles</div>
+      <div class="user-pill" id="user-pill"></div>
+      <button class="signout-btn" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- MODE BAR -->
+    <div class="mode-bar">
+      <span class="mode-bar-label">Mode:</span>
+      <button class="mode-btn active" onclick="setMode('work', this)" data-mode="work">💼 Work</button>
+      <button class="mode-btn" onclick="setMode('fitness', this)" data-mode="fitness">💪 Fitness</button>
+      <button class="mode-btn" onclick="setMode('personal', this)" data-mode="personal">🌱 Personal</button>
+      <div id="custom-mode-btns"></div>
+      <button class="mode-btn-add" onclick="openCustomModal()">＋ Custom Mode</button>
+    </div>
+
+    <!-- STATS -->
+    <div class="stat-row" id="stat-row"></div>
+
+    <!-- DYNAMIC PANELS -->
+    <div class="panels panels-2" id="main-panels"></div>
+
+    <!-- ACHIEVEMENTS -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">🏆 Pickle Achievements</div>
+        <div style="font-size:12px;color:var(--text3);font-family:var(--mono)"><span id="ach-count">0</span> / <span id="ach-total">0</span> unlocked</div>
+      </div>
+      <div class="achievements-grid" id="achievements-grid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://ciyebticbmhntyvndavo.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpeWVidGljYm1obnR5dm5kYXZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MzM3MTUsImV4cCI6MjA5MjMwOTcxNX0.GNQhC-z78ylmMy0lRUvIXiYq-pISIiRNzQpTZLA2sxU';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ---- STATE ----
+let user = null;
+let tasks = [], timeLogs = [], workouts = [], habits = [], habitLogs = [];
+let foodLog = [];
+let pickleCount = 0;
+let unlockedAchievements = new Set();
+let customModes = [];
+let currentMode = 'work';
+let timerRunning = false, timerSeconds = 0, timerInterval = null, sessionStart = null;
+let currentFilter = 'all';
+let selectedWidgets = new Set(['timer','tasks']);
+
+// ---- ACHIEVEMENTS ----
+const ACHIEVEMENTS = [
+  { id:'first_task', icon:'🥒', name:'First Pickle', desc:'Complete your first task', pickles:5 },
+  { id:'ten_tasks', icon:'🏺', name:'Pickle Jar', desc:'Complete 10 tasks', pickles:20 },
+  { id:'fifty_tasks', icon:'🫙', name:'Full Jar', desc:'Complete 50 tasks', pickles:100 },
+  { id:'first_timer', icon:'⏱️', name:'On the Clock', desc:'Log your first time session', pickles:5 },
+  { id:'one_hour', icon:'🕐', name:'Hour of Power', desc:'Track 1 hour in a day', pickles:15 },
+  { id:'eight_hours', icon:'🦺', name:'Full Workday', desc:'Track 8 hours in a day', pickles:50 },
+  { id:'first_workout', icon:'🏋️', name:'Gym Pickle', desc:'Log your first workout', pickles:10 },
+  { id:'seven_workouts', icon:'💪', name:'Pickle Power', desc:'Log 7 workouts', pickles:30 },
+  { id:'streak_3', icon:'🔥', name:'On a Roll', desc:'3-day habit streak', pickles:15 },
+  { id:'streak_7', icon:'🌶️', name:'Fermented', desc:'7-day habit streak', pickles:40 },
+  { id:'hundred_pickles', icon:'🎉', name:'Pickle Rich', desc:'Earn 100 pickles', pickles:0 },
+  { id:'all_modes', icon:'🌈', name:'Full Brine', desc:'Try all 3 modes', pickles:25 },
+];
+
+// ---- WIDGETS ----
+const WIDGETS = [
+  { id:'timer', icon:'⏱️', name:'Time Tracker', desc:'Track work sessions' },
+  { id:'tasks', icon:'✅', name:'To-Do List', desc:'Tasks & tickets' },
+  { id:'calories', icon:'🍽️', name:'Calorie Tracker', desc:'Log meals & macros' },
+  { id:'workouts', icon:'💪', name:'Workouts', desc:'Log exercise' },
+  { id:'habits', icon:'🌱', name:'Habits', desc:'Daily habit tracking' },
+  { id:'notes', icon:'📝', name:'Quick Notes', desc:'Freeform notes' },
+];
+
+// ---- FLOATING PICKLES ----
+function spawnPickles() {
+  const bg = document.getElementById('pickle-bg');
+  const emojis = ['🥒','🫙','🥒','🥒','🌿'];
+  for(let i = 0; i < 12; i++) {
+    const s = document.createElement('span');
+    s.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    s.style.left = Math.random()*100+'%';
+    s.style.animationDuration = (15 + Math.random()*20)+'s';
+    s.style.animationDelay = (Math.random()*20)+'s';
+    s.style.fontSize = (1.5 + Math.random()*2)+'rem';
+    bg.appendChild(s);
+  }
+}
+
+// ---- AUTH NAVIGATION ----
+function goToSignUp() {
+  document.getElementById('signin-screen').classList.remove('active');
+  document.getElementById('signup-screen').classList.add('active');
+  document.getElementById('signup-email').focus();
+  // clear any previous errors
+  document.getElementById('signin-error').style.display='none';
+  document.getElementById('signup-error').style.display='none';
+  document.getElementById('signup-msg').style.display='none';
+}
+function goToSignIn() {
+  document.getElementById('signup-screen').classList.remove('active');
+  document.getElementById('signin-screen').classList.add('active');
+  document.getElementById('signin-email').focus();
+  document.getElementById('signin-error').style.display='none';
+}
+
+// ---- SIGN IN ----
+async function doSignIn() {
+  const email = document.getElementById('signin-email').value.trim();
+  const pw = document.getElementById('signin-password').value;
+  const errEl = document.getElementById('signin-error');
+  errEl.style.display='none';
+  if(!email||!pw){errEl.textContent='Please enter your email and password.';errEl.style.display='block';return;}
+  const btn = document.getElementById('signin-btn');
+  btn.textContent='Signing in...'; btn.disabled=true;
+  try {
+    const {data,error} = await db.auth.signInWithPassword({email, password:pw});
+    if(error) throw error;
+    user = data.user;
+    showApp();
+  } catch(e){
+    errEl.textContent = e.message||'Sign in failed. Please try again.';
+    errEl.style.display='block';
+  }
+  btn.textContent='Sign In 🥒'; btn.disabled=false;
+}
+
+// ---- SIGN UP ----
+async function doSignUp() {
+  const email = document.getElementById('signup-email').value.trim();
+  const pw = document.getElementById('signup-password').value;
+  const confirm = document.getElementById('signup-confirm').value;
+  const errEl = document.getElementById('signup-error');
+  const msgEl = document.getElementById('signup-msg');
+  errEl.style.display='none'; msgEl.style.display='none';
+  if(!email||!pw){errEl.textContent='Please fill in all fields.';errEl.style.display='block';return;}
+  if(pw.length<6){errEl.textContent='Password must be at least 6 characters.';errEl.style.display='block';return;}
+  if(pw!==confirm){errEl.textContent='Passwords do not match.';errEl.style.display='block';return;}
+  const btn = document.getElementById('signup-btn');
+  btn.textContent='Creating account...'; btn.disabled=true;
+  try {
+    const {error} = await db.auth.signUp({email, password:pw});
+    if(error) throw error;
+    msgEl.textContent='Account created! You can now sign in.';
+    msgEl.style.display='block';
+    setTimeout(()=>goToSignIn(), 2000);
+  } catch(e){
+    errEl.textContent = e.message||'Sign up failed. Please try again.';
+    errEl.style.display='block';
+  }
+  btn.textContent='Create Account 🥒'; btn.disabled=false;
+}
+
+async function signOut(){
+  await db.auth.signOut(); user=null; tasks=[];timeLogs=[];workouts=[];habits=[];habitLogs=[];foodLog=[];
+  clearInterval(timerInterval);timerRunning=false;timerSeconds=0;
+  document.getElementById('app-screen').style.display='none';
+  goToSignIn();
+}
+
+// ---- SHOW APP ----
+async function showApp() {
+  document.getElementById('signin-screen').classList.remove('active');
+  document.getElementById('signup-screen').classList.remove('active');
+  document.getElementById('app-screen').style.display='flex';
+  document.getElementById('user-pill').textContent = user.email;
+  await loadAllData();
+  renderMode();
+  renderAchievements();
+  checkModeAchievement('work');
+}
+
+async function loadAllData() {
+  const today = new Date().toISOString().split('T')[0];
+  const [t, tl, w, h, hl, fl, ach, cm] = await Promise.all([
+    db.from('tasks').select('*').eq('user_id', user.id).order('created_at',{ascending:false}),
+    db.from('time_logs').select('*').eq('user_id',user.id).gte('logged_at',today+'T00:00:00').order('logged_at',{ascending:false}),
+    db.from('workouts').select('*').eq('user_id',user.id).gte('logged_at',today+'T00:00:00').order('logged_at',{ascending:false}),
+    db.from('habits').select('*').eq('user_id',user.id).order('created_at',{ascending:true}),
+    db.from('habit_logs').select('*').eq('user_id',user.id).eq('log_date',today),
+    db.from('food_log').select('*').eq('user_id',user.id).eq('log_date',today).order('created_at',{ascending:false}),
+    db.from('achievements').select('*').eq('user_id',user.id),
+    db.from('custom_modes').select('*').eq('user_id',user.id),
+  ]);
+  tasks = t.data||[]; timeLogs = tl.data||[]; workouts = w.data||[];
+  habits = h.data||[]; habitLogs = hl.data||[]; foodLog = fl.data||[];
+  unlockedAchievements = new Set((ach.data||[]).map(a=>a.achievement_id));
+  pickleCount = (ach.data||[]).reduce((s,a)=>s+(a.pickles||0),0);
+  customModes = cm.data||[];
+  document.getElementById('pickle-count').textContent = pickleCount;
+  renderCustomModeBtns();
+}
+
+// ---- MODES ----
+const modesUsed = new Set();
+function setMode(mode, btn) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentFilter = 'all';
+  modesUsed.add(mode);
+  if(modesUsed.size>=3) unlockAchievement('all_modes');
+  renderMode();
+}
+
+function renderMode() {
+  if(currentMode === 'work') renderWorkMode();
+  else if(currentMode === 'fitness') renderFitnessMode();
+  else if(currentMode === 'personal') renderPersonalMode();
+  else renderCustomModeView(currentMode);
+}
+
+// ---- WORK MODE ----
+function renderWorkMode() {
+  renderWorkStats();
+  const panels = document.getElementById('main-panels');
+  panels.className = 'panels panels-2';
+  panels.innerHTML = `
+    <div class="panel" id="timer-panel">
+      <div class="panel-title">⏱️ Time Tracker</div>
+      <div class="timer-display" id="timer-display">00:00:00</div>
+      <div class="timer-label" id="timer-label">No task selected</div>
+      <input class="inp" type="text" id="timer-task-input" placeholder="What are you working on?"/>
+      <div class="btn-row">
+        <button class="btn primary flex1" id="start-btn" onclick="toggleTimer()">Start</button>
+        <button class="btn" onclick="logAndReset()">Log & Reset</button>
+      </div>
+      <div>
+        <div class="panel-title" style="margin-bottom:8px">Today's Sessions</div>
+        <div class="log-list" id="time-log"><div class="loading">Loading...</div></div>
+      </div>
+    </div>
+    <div class="panel" id="tasks-panel">
+      <div class="panel-title">✅ To-Do List</div>
+      <div class="task-add-row">
+        <input class="inp" type="text" id="task-input" placeholder="Add task, case, or ticket..." onkeydown="if(event.key==='Enter')addTask()"/>
+        <select class="inp" id="task-priority" style="width:120px">
+          <option value="med">Medium</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+          <option value="case">Case/Ticket</option>
+        </select>
+        <button class="btn primary" onclick="addTask()">Add</button>
+      </div>
+      <div class="filter-row">
+        <button class="filt active" onclick="setFilter('all',this)">All</button>
+        <button class="filt" onclick="setFilter('active',this)">Active</button>
+        <button class="filt" onclick="setFilter('case',this)">Cases</button>
+        <button class="filt" onclick="setFilter('high',this)">High</button>
+        <button class="filt" onclick="setFilter('done',this)">Done</button>
+      </div>
+      <div class="task-list" id="task-list"><div class="loading">Loading...</div></div>
+    </div>
+  `;
+  renderTimerUI();
+  renderTasks();
+}
+
+function renderWorkStats() {
+  const all = tasks, done = tasks.filter(t=>t.done);
+  const pct = all.length ? Math.round(done.length/all.length*100):0;
+  const totalSec = timeLogs.reduce((a,l)=>a+l.duration_seconds,0);
+  const h = Math.floor(totalSec/3600), m = Math.floor(totalSec%3600/60);
+  const cases = tasks.filter(t=>t.priority==='case'&&!t.done).length;
+  document.getElementById('stat-row').innerHTML = `
+    <div class="stat-card" data-emoji="✅">
+      <div class="stat-label">Tasks Complete</div>
+      <div class="stat-value">${done.length}/${all.length}</div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    </div>
+    <div class="stat-card" data-emoji="⏱️">
+      <div class="stat-label">Time Tracked</div>
+      <div class="stat-value">${h}h ${m}m</div>
+      <div class="stat-sub">${timeLogs.length} sessions today</div>
+    </div>
+    <div class="stat-card" data-emoji="🎫">
+      <div class="stat-label">Open Cases</div>
+      <div class="stat-value">${cases}</div>
+      <div class="stat-sub">pending follow-up</div>
+    </div>
+    <div class="stat-card" data-emoji="🥒">
+      <div class="stat-label">Pickles Earned</div>
+      <div class="stat-value">${pickleCount}</div>
+      <div class="stat-sub">keep grinding!</div>
+    </div>
+  `;
+}
+
+// ---- FITNESS MODE ----
+function renderFitnessMode() {
+  modesUsed.add('fitness');
+  const totalCals = foodLog.reduce((a,f)=>a+f.calories,0);
+  const totalProtein = foodLog.reduce((a,f)=>a+(f.protein||0),0);
+  const totalCarbs = foodLog.reduce((a,f)=>a+(f.carbs||0),0);
+
+  document.getElementById('stat-row').innerHTML = `
+    <div class="stat-card" data-emoji="🔥">
+      <div class="stat-label">Calories Today</div>
+      <div class="stat-value">${totalCals}</div>
+      <div class="stat-sub">goal: 2000</div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(totalCals/2000*100,100)}%"></div></div>
+    </div>
+    <div class="stat-card" data-emoji="💪">
+      <div class="stat-label">Workouts Today</div>
+      <div class="stat-value">${workouts.length}</div>
+      <div class="stat-sub">${workouts.reduce((a,w)=>a+(w.duration_minutes||0),0)} mins total</div>
+    </div>
+    <div class="stat-card" data-emoji="🥩">
+      <div class="stat-label">Protein</div>
+      <div class="stat-value">${totalProtein}g</div>
+      <div class="stat-sub">goal: 150g</div>
+    </div>
+    <div class="stat-card" data-emoji="🥒">
+      <div class="stat-label">Pickles Earned</div>
+      <div class="stat-value">${pickleCount}</div>
+      <div class="stat-sub">stay strong!</div>
+    </div>
+  `;
+
+  const panels = document.getElementById('main-panels');
+  panels.className = 'panels panels-2';
+  panels.innerHTML = `
+    <div class="panel">
+      <div class="panel-title">🍽️ Food Log</div>
+      <div class="macro-row">
+        <div class="macro-card"><div class="macro-val">${totalCals}</div><div class="macro-label">Calories</div><div class="macro-goal">/ 2000</div></div>
+        <div class="macro-card"><div class="macro-val">${totalProtein}g</div><div class="macro-label">Protein</div><div class="macro-goal">/ 150g</div></div>
+        <div class="macro-card"><div class="macro-val">${totalCarbs}g</div><div class="macro-label">Carbs</div><div class="macro-goal">/ 200g</div></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input class="inp" type="text" id="food-name" placeholder="Food name" style="flex:2;min-width:120px"/>
+        <input class="inp" type="number" id="food-cals" placeholder="Cal" style="width:70px"/>
+        <input class="inp" type="number" id="food-protein" placeholder="Pro(g)" style="width:70px"/>
+        <input class="inp" type="number" id="food-carbs" placeholder="Carb(g)" style="width:70px"/>
+        <button class="btn primary" onclick="addFood()">Add</button>
+      </div>
+      <div class="task-list" id="food-list">
+        ${foodLog.length===0?'<div class="empty"><div class="empty-icon">🍽️</div>No food logged yet</div>':
+          foodLog.map(f=>`<div class="task-item">
+            <div class="task-body">
+              <div class="task-text">${esc(f.name)}</div>
+              <div class="task-meta">
+                <span class="badge badge-high">${f.calories} cal</span>
+                ${f.protein?`<span class="badge badge-low">${f.protein}g protein</span>`:''}
+                ${f.carbs?`<span class="badge badge-med">${f.carbs}g carbs</span>`:''}
+              </div>
+            </div>
+            <button class="task-del" onclick="deleteFood('${f.id}')">✕</button>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">💪 Workout Log</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+        <select class="inp" id="workout-type" style="width:130px">
+          <option value="🏋️ Weights">🏋️ Weights</option>
+          <option value="🏃 Cardio">🏃 Cardio</option>
+          <option value="🧘 Yoga">🧘 Yoga</option>
+          <option value="🚴 Cycling">🚴 Cycling</option>
+          <option value="🏊 Swimming">🏊 Swimming</option>
+          <option value="🥊 HIIT">🥊 HIIT</option>
+          <option value="🤸 Stretching">🤸 Stretching</option>
+        </select>
+        <input class="inp" type="text" id="workout-name" placeholder="Name (e.g. Bench Press)" style="flex:2;min-width:120px"/>
+        <input class="inp" type="number" id="workout-mins" placeholder="Mins" style="width:70px"/>
+        <button class="btn primary" onclick="addWorkout()">Add</button>
+      </div>
+      <div class="workout-list" id="workout-list">
+        ${workouts.length===0?'<div class="empty"><div class="empty-icon">💪</div>No workouts logged</div>':
+          workouts.map(w=>`<div class="workout-item">
+            <div class="workout-item-left">
+              <div class="workout-type">${w.type.split(' ')[0]}</div>
+              <div><div class="workout-name">${esc(w.name)}</div><div class="workout-meta">${w.type.split(' ').slice(1).join(' ')} · ${w.duration_minutes} min</div></div>
+            </div>
+            <button class="workout-del" onclick="deleteWorkout('${w.id}')">✕</button>
+          </div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ---- PERSONAL MODE ----
+function renderPersonalMode() {
+  modesUsed.add('personal');
+  const today = new Date().toISOString().split('T')[0];
+  const doneToday = habitLogs.filter(l=>l.log_date===today).length;
+  const maxStreak = habits.length>0 ? Math.max(...habits.map(h=>h.streak||0), 0) : 0;
+
+  document.getElementById('stat-row').innerHTML = `
+    <div class="stat-card" data-emoji="🌱">
+      <div class="stat-label">Habits Done</div>
+      <div class="stat-value">${doneToday}/${habits.length}</div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${habits.length?doneToday/habits.length*100:0}%"></div></div>
+    </div>
+    <div class="stat-card" data-emoji="🔥">
+      <div class="stat-label">Best Streak</div>
+      <div class="stat-value">${maxStreak}d</div>
+      <div class="stat-sub">keep going!</div>
+    </div>
+    <div class="stat-card" data-emoji="✅">
+      <div class="stat-label">Tasks Pending</div>
+      <div class="stat-value">${tasks.filter(t=>!t.done).length}</div>
+      <div class="stat-sub">on the list</div>
+    </div>
+    <div class="stat-card" data-emoji="🥒">
+      <div class="stat-label">Pickles Earned</div>
+      <div class="stat-value">${pickleCount}</div>
+      <div class="stat-sub">you're on a roll!</div>
+    </div>
+  `;
+
+  const panels = document.getElementById('main-panels');
+  panels.className = 'panels panels-2';
+  panels.innerHTML = `
+    <div class="panel">
+      <div class="panel-title">🌱 Daily Habits</div>
+      <div style="display:flex;gap:8px;margin-bottom:4px">
+        <input class="inp" type="text" id="habit-input" placeholder="New habit..." style="flex:1" onkeydown="if(event.key==='Enter')addHabit()"/>
+        <button class="btn primary" onclick="addHabit()">Add</button>
+      </div>
+      <div class="habit-list" id="habit-list">
+        ${habits.length===0?'<div class="empty"><div class="empty-icon">🌱</div>Add your first habit!</div>':
+          habits.map(h=>{
+            const done = habitLogs.some(l=>l.habit_id===h.id);
+            return `<div class="habit-item ${done?'completed':''}">
+              <button class="habit-check-btn ${done?'done':''}" onclick="toggleHabit('${h.id}','${done}')">${done?'✓':''}</button>
+              <div class="habit-name">${esc(h.name)}</div>
+              <div class="habit-streak">🔥 ${h.streak||0}d</div>
+              <button class="habit-del" onclick="deleteHabit('${h.id}')">✕</button>
+            </div>`;
+          }).join('')}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">✅ Personal To-Dos</div>
+      <div class="task-add-row">
+        <input class="inp" type="text" id="task-input" placeholder="Add a goal or task..." onkeydown="if(event.key==='Enter')addTask()"/>
+        <select class="inp" id="task-priority" style="width:100px">
+          <option value="med">Medium</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+        </select>
+        <button class="btn primary" onclick="addTask()">Add</button>
+      </div>
+      <div class="filter-row">
+        <button class="filt active" onclick="setFilter('all',this)">All</button>
+        <button class="filt" onclick="setFilter('active',this)">Active</button>
+        <button class="filt" onclick="setFilter('done',this)">Done</button>
+      </div>
+      <div class="task-list" id="task-list"><div class="loading">Loading...</div></div>
+    </div>
+  `;
+  renderTasks();
+}
+
+// ---- CUSTOM MODES ----
+function openCustomModal() {
+  const grid = document.getElementById('widget-grid');
+  selectedWidgets = new Set(['tasks']);
+  grid.innerHTML = WIDGETS.map(w=>`
+    <div class="widget-option ${selectedWidgets.has(w.id)?'selected':''}" onclick="toggleWidget('${w.id}',this)">
+      <div class="widget-option-icon">${w.icon}</div>
+      <div class="widget-option-name">${w.name}</div>
+      <div class="widget-option-desc">${w.desc}</div>
+    </div>
+  `).join('');
+  document.getElementById('custom-modal').classList.add('open');
+}
+function closeCustomModal(){ document.getElementById('custom-modal').classList.remove('open'); }
+function toggleWidget(id, el) {
+  if(selectedWidgets.has(id)) { selectedWidgets.delete(id); el.classList.remove('selected'); }
+  else { selectedWidgets.add(id); el.classList.add('selected'); }
+}
+async function saveCustomMode() {
+  const name = document.getElementById('custom-mode-name').value.trim();
+  if(!name){ alert('Please enter a mode name'); return; }
+  const widgets = [...selectedWidgets];
+  const {data} = await db.from('custom_modes').insert([{user_id:user.id, name, widgets}]).select();
+  if(data){ customModes.push(data[0]); renderCustomModeBtns(); closeCustomModal(); showToast('🥒','New Mode Created!',`"${name}" is ready to go`); }
+}
+function renderCustomModeBtns() {
+  document.getElementById('custom-mode-btns').innerHTML = customModes.map(m=>
+    `<button class="mode-btn" onclick="setCustomMode('${m.id}',this)" data-mode="${m.id}">${m.name}</button>`
+  ).join('');
+}
+function setCustomMode(id, btn) {
+  currentMode = id;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCustomModeView(id);
+}
+function renderCustomModeView(id) {
+  const mode = customModes.find(m=>m.id===id);
+  if(!mode){ renderWorkMode(); return; }
+  const widgets = mode.widgets||[];
+  document.getElementById('stat-row').innerHTML = `
+    <div class="stat-card" data-emoji="🥒">
+      <div class="stat-label">Pickles Earned</div>
+      <div class="stat-value">${pickleCount}</div>
+    </div>
+    <div class="stat-card" data-emoji="✅">
+      <div class="stat-label">Tasks Done</div>
+      <div class="stat-value">${tasks.filter(t=>t.done).length}/${tasks.length}</div>
+    </div>
+  `;
+  const panels = document.getElementById('main-panels');
+  const cols = widgets.length === 1 ? 'panels-1' : widgets.length >= 3 ? 'panels-3' : 'panels-2';
+  panels.className = `panels ${cols}`;
+  panels.innerHTML = widgets.map(w => renderWidgetHTML(w)).join('');
+  if(widgets.includes('tasks')) renderTasks();
+  if(widgets.includes('timer')) renderTimerUI();
+}
+function renderWidgetHTML(w) {
+  if(w==='timer') return `<div class="panel" id="timer-panel">
+    <div class="panel-title">⏱️ Time Tracker</div>
+    <div class="timer-display" id="timer-display">00:00:00</div>
+    <div class="timer-label" id="timer-label">No task selected</div>
+    <input class="inp" type="text" id="timer-task-input" placeholder="What are you working on?"/>
+    <div class="btn-row">
+      <button class="btn primary flex1" id="start-btn" onclick="toggleTimer()">Start</button>
+      <button class="btn" onclick="logAndReset()">Log & Reset</button>
+    </div>
+    <div class="log-list" id="time-log"></div>
+  </div>`;
+  if(w==='tasks') return `<div class="panel">
+    <div class="panel-title">✅ To-Do List</div>
+    <div class="task-add-row">
+      <input class="inp" type="text" id="task-input" placeholder="Add a task..." onkeydown="if(event.key==='Enter')addTask()"/>
+      <select class="inp" id="task-priority" style="width:110px">
+        <option value="med">Medium</option><option value="high">High</option><option value="low">Low</option>
+      </select>
+      <button class="btn primary" onclick="addTask()">Add</button>
+    </div>
+    <div class="filter-row">
+      <button class="filt active" onclick="setFilter('all',this)">All</button>
+      <button class="filt" onclick="setFilter('active',this)">Active</button>
+      <button class="filt" onclick="setFilter('done',this)">Done</button>
+    </div>
+    <div class="task-list" id="task-list"></div>
+  </div>`;
+  if(w==='habits') return `<div class="panel">
+    <div class="panel-title">🌱 Habits</div>
+    <div style="display:flex;gap:8px;margin-bottom:4px">
+      <input class="inp" type="text" id="habit-input" placeholder="New habit..." style="flex:1" onkeydown="if(event.key==='Enter')addHabit()"/>
+      <button class="btn primary" onclick="addHabit()">Add</button>
+    </div>
+    <div class="habit-list" id="habit-list">${habits.length===0?'<div class="empty">No habits yet</div>':habits.map(h=>{const done=habitLogs.some(l=>l.habit_id===h.id);return `<div class="habit-item ${done?'completed':''}"><button class="habit-check-btn ${done?'done':''}" onclick="toggleHabit('${h.id}','${done}')">${done?'✓':''}</button><div class="habit-name">${esc(h.name)}</div><div class="habit-streak">🔥${h.streak||0}d</div><button class="habit-del" onclick="deleteHabit('${h.id}')">✕</button></div>`;}).join('')}</div>
+  </div>`;
+  if(w==='workouts') return `<div class="panel">
+    <div class="panel-title">💪 Workouts</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+      <select class="inp" id="workout-type" style="width:130px"><option value="🏋️ Weights">🏋️ Weights</option><option value="🏃 Cardio">🏃 Cardio</option><option value="🧘 Yoga">🧘 Yoga</option></select>
+      <input class="inp" type="text" id="workout-name" placeholder="Exercise name" style="flex:1"/>
+      <input class="inp" type="number" id="workout-mins" placeholder="Mins" style="width:70px"/>
+      <button class="btn primary" onclick="addWorkout()">Add</button>
+    </div>
+    <div class="workout-list" id="workout-list">${workouts.length===0?'<div class="empty">No workouts yet</div>':workouts.map(w=>`<div class="workout-item"><div class="workout-item-left"><div class="workout-type">${w.type.split(' ')[0]}</div><div><div class="workout-name">${esc(w.name)}</div><div class="workout-meta">${w.duration_minutes}min</div></div></div><button class="workout-del" onclick="deleteWorkout('${w.id}')">✕</button></div>`).join('')}</div>
+  </div>`;
+  if(w==='calories') return `<div class="panel">
+    <div class="panel-title">🍽️ Calorie Tracker</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input class="inp" type="text" id="food-name" placeholder="Food name" style="flex:2;min-width:100px"/>
+      <input class="inp" type="number" id="food-cals" placeholder="Cal" style="width:65px"/>
+      <input class="inp" type="number" id="food-protein" placeholder="Pro" style="width:55px"/>
+      <button class="btn primary" onclick="addFood()">Add</button>
+    </div>
+    <div class="task-list" id="food-list">${foodLog.length===0?'<div class="empty">No food logged</div>':foodLog.map(f=>`<div class="task-item"><div class="task-body"><div class="task-text">${esc(f.name)}</div><div class="task-meta"><span class="badge badge-high">${f.calories}cal</span>${f.protein?`<span class="badge badge-low">${f.protein}g</span>`:''}</div></div><button class="task-del" onclick="deleteFood('${f.id}')">✕</button></div>`).join('')}</div>
+  </div>`;
+  if(w==='notes') return `<div class="panel">
+    <div class="panel-title">📝 Quick Notes</div>
+    <textarea class="inp" id="notes-area" style="height:200px;resize:vertical" placeholder="Jot anything down...">${localStorage.getItem('pickle_notes_'+user.id)||''}</textarea>
+    <button class="btn primary" onclick="saveNotes()">Save Notes</button>
+  </div>`;
+  return '';
+}
+
+function saveNotes() {
+  const v = document.getElementById('notes-area')?.value||'';
+  localStorage.setItem('pickle_notes_'+user.id, v);
+  showToast('📝','Notes Saved!','Your notes are saved locally');
+}
+
+// ---- TIMER ----
+function renderTimerUI() {
+  if(!document.getElementById('timer-display')) return;
+  document.getElementById('timer-display').textContent = fmtTime(timerSeconds);
+  renderLogs();
+  if(timerRunning) {
+    document.getElementById('start-btn').textContent='Pause';
+    document.getElementById('start-btn').className='btn running flex1';
+  }
+}
+function toggleTimer() {
+  if(!timerRunning) {
+    timerRunning=true; sessionStart=Date.now()-timerSeconds*1000;
+    timerInterval=setInterval(tickTimer,1000);
+    document.getElementById('start-btn').textContent='Pause';
+    document.getElementById('start-btn').className='btn running flex1';
+    const label=document.getElementById('timer-task-input')?.value.trim()||'Unnamed task';
+    if(document.getElementById('timer-label')) document.getElementById('timer-label').textContent=label;
+  } else {
+    timerRunning=false; clearInterval(timerInterval);
+    document.getElementById('start-btn').textContent='Resume';
+    document.getElementById('start-btn').className='btn primary flex1';
+  }
+}
+function tickTimer() {
+  timerSeconds=Math.round((Date.now()-sessionStart)/1000);
+  if(document.getElementById('timer-display')) document.getElementById('timer-display').textContent=fmtTime(timerSeconds);
+}
+async function logAndReset() {
+  if(timerSeconds<5){resetTimerUI();return;}
+  const label=document.getElementById('timer-task-input')?.value.trim()||'Unnamed task';
+  clearInterval(timerInterval);
+  const {data}=await db.from('time_logs').insert([{user_id:user.id,label,duration_seconds:timerSeconds}]).select();
+  if(data) timeLogs.unshift(data[0]);
+  const totalSec=timeLogs.reduce((a,l)=>a+l.duration_seconds,0);
+  if(totalSec>=3600) unlockAchievement('one_hour');
+  if(totalSec>=28800) unlockAchievement('eight_hours');
+  if(timeLogs.length===1) unlockAchievement('first_timer');
+  resetTimerUI(); renderLogs(); renderMode();
+  awardPickles(3, '⏱️ Session logged!');
+}
+function resetTimerUI() {
+  clearInterval(timerInterval); timerRunning=false; timerSeconds=0; sessionStart=null;
+  if(document.getElementById('timer-display')) document.getElementById('timer-display').textContent='00:00:00';
+  const sb=document.getElementById('start-btn');
+  if(sb){sb.textContent='Start';sb.className='btn primary flex1';}
+  if(document.getElementById('timer-label')) document.getElementById('timer-label').textContent='No task selected';
+  if(document.getElementById('timer-task-input')) document.getElementById('timer-task-input').value='';
+}
+function renderLogs() {
+  const el=document.getElementById('time-log'); if(!el)return;
+  if(!timeLogs.length){el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:8px 0">No sessions yet today</div>';return;}
+  el.innerHTML=timeLogs.slice(0,6).map(l=>{
+    const t=new Date(l.logged_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    return `<div class="log-item"><span class="log-label">${esc(l.label)}</span><span class="log-dur">${fmtDur(l.duration_seconds)}</span><span class="log-time">${t}</span></div>`;
+  }).join('');
+}
+
+// ---- TASKS ----
+async function addTask() {
+  const input=document.getElementById('task-input');
+  const text=input?.value.trim(); if(!text)return;
+  const priority=document.getElementById('task-priority')?.value||'med';
+  const today=new Date().toISOString().split('T')[0];
+  const {data}=await db.from('tasks').insert([{user_id:user.id,text,priority,done:false,added:today}]).select();
+  if(data){tasks.unshift(data[0]); input.value=''; renderTasks(); awardPickles(1,'🥒 Task added!');}
+}
+async function toggleTask(id) {
+  const t=tasks.find(t=>t.id===id); if(!t)return;
+  t.done=!t.done; renderTasks();
+  await db.from('tasks').update({done:t.done}).eq('id',id);
+  if(t.done) {
+    const doneTasks=tasks.filter(t=>t.done).length;
+    if(doneTasks===1) unlockAchievement('first_task');
+    if(doneTasks===10) unlockAchievement('ten_tasks');
+    if(doneTasks===50) unlockAchievement('fifty_tasks');
+    awardPickles(2,'✅ Task complete!');
+  }
+  renderMode();
+}
+async function deleteTask(id) {
+  tasks=tasks.filter(t=>t.id!==id);
+  renderTasks(); renderMode();
+  await db.from('tasks').delete().eq('id',id);
+}
+function setFilter(f,btn) {
+  currentFilter=f;
+  document.querySelectorAll('.filt').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); renderTasks();
+}
+function renderTasks() {
+  const el=document.getElementById('task-list'); if(!el)return;
+  let f=[...tasks];
+  if(currentFilter==='active') f=f.filter(t=>!t.done);
+  else if(currentFilter==='done') f=f.filter(t=>t.done);
+  else if(currentFilter==='case') f=f.filter(t=>t.priority==='case');
+  else if(currentFilter==='high') f=f.filter(t=>t.priority==='high');
+  f.sort((a,b)=>{
+    if(a.done!==b.done)return a.done?1:-1;
+    const o={high:0,case:1,med:2,low:3};
+    return (o[a.priority]||2)-(o[b.priority]||2);
+  });
+  if(!f.length){el.innerHTML='<div class="empty"><div class="empty-icon">🥒</div>Nothing here yet!</div>';return;}
+  el.innerHTML=f.map(t=>`<div class="task-item">
+    <div class="task-check ${t.done?'done':''}" onclick="toggleTask('${t.id}')"></div>
+    <div class="task-body">
+      <div class="task-text ${t.done?'done':''}">${esc(t.text)}</div>
+      <div class="task-meta">
+        <span class="badge badge-${t.priority}">${t.priority==='case'?'CASE/TICKET':t.priority.toUpperCase()}</span>
+        <span class="task-date">Added ${t.added}</span>
+      </div>
+    </div>
+    <button class="task-del" onclick="deleteTask('${t.id}')">✕</button>
+  </div>`).join('');
+}
+
+// ---- FOOD ----
+async function addFood() {
+  const name=document.getElementById('food-name')?.value.trim(); if(!name)return;
+  const calories=parseInt(document.getElementById('food-cals')?.value)||0;
+  const protein=parseInt(document.getElementById('food-protein')?.value)||0;
+  const carbs=parseInt(document.getElementById('food-carbs')?.value)||0;
+  const today=new Date().toISOString().split('T')[0];
+  const {data}=await db.from('food_log').insert([{user_id:user.id,name,calories,protein,carbs,log_date:today}]).select();
+  if(data){foodLog.unshift(data[0]); awardPickles(1,'🍽️ Meal logged!'); renderFitnessMode();}
+}
+async function deleteFood(id){
+  foodLog=foodLog.filter(f=>f.id!==id);
+  await db.from('food_log').delete().eq('id',id); renderFitnessMode();
+}
+
+// ---- WORKOUTS ----
+async function addWorkout() {
+  const type=document.getElementById('workout-type')?.value||'🏋️ Weights';
+  const name=document.getElementById('workout-name')?.value.trim(); if(!name)return;
+  const duration_minutes=parseInt(document.getElementById('workout-mins')?.value)||30;
+  const {data}=await db.from('workouts').insert([{user_id:user.id,type,name,duration_minutes}]).select();
+  if(data){
+    workouts.unshift(data[0]);
+    if(workouts.length===1) unlockAchievement('first_workout');
+    if(workouts.length>=7) unlockAchievement('seven_workouts');
+    awardPickles(5,'💪 Workout logged!');
+    renderFitnessMode();
+  }
+}
+async function deleteWorkout(id){
+  workouts=workouts.filter(w=>w.id!==id);
+  await db.from('workouts').delete().eq('id',id); renderFitnessMode();
+}
+
+// ---- HABITS ----
+async function addHabit() {
+  const input=document.getElementById('habit-input');
+  const name=input?.value.trim(); if(!name)return;
+  const {data}=await db.from('habits').insert([{user_id:user.id,name,streak:0}]).select();
+  if(data){habits.push(data[0]); input.value=''; renderMode();}
+}
+async function toggleHabit(id, isDone) {
+  const today=new Date().toISOString().split('T')[0];
+  const done = isDone==='true'||isDone===true;
+  const habit=habits.find(h=>h.id===id); if(!habit)return;
+  if(!done) {
+    await db.from('habit_logs').insert([{user_id:user.id,habit_id:id,log_date:today}]);
+    habitLogs.push({habit_id:id,log_date:today});
+    habit.streak=(habit.streak||0)+1;
+    await db.from('habits').update({streak:habit.streak}).eq('id',id);
+    if(habit.streak>=3) unlockAchievement('streak_3');
+    if(habit.streak>=7) unlockAchievement('streak_7');
+    awardPickles(3,'🌱 Habit complete!');
+  } else {
+    await db.from('habit_logs').delete().eq('habit_id',id).eq('log_date',today);
+    habitLogs=habitLogs.filter(l=>!(l.habit_id===id&&l.log_date===today));
+    habit.streak=Math.max((habit.streak||1)-1,0);
+    await db.from('habits').update({streak:habit.streak}).eq('id',id);
+  }
+  renderMode();
+}
+async function deleteHabit(id){
+  habits=habits.filter(h=>h.id!==id);
+  await db.from('habits').delete().eq('id',id); renderMode();
+}
+
+// ---- ACHIEVEMENTS ----
+function renderAchievements() {
+  const grid=document.getElementById('achievements-grid');
+  const unlocked=ACHIEVEMENTS.filter(a=>unlockedAchievements.has(a.id)).length;
+  document.getElementById('ach-count').textContent=unlocked;
+  document.getElementById('ach-total').textContent=ACHIEVEMENTS.length;
+  grid.innerHTML=ACHIEVEMENTS.map(a=>`
+    <div class="achievement ${unlockedAchievements.has(a.id)?'unlocked':''}">
+      <div class="achievement-icon">${a.icon}</div>
+      <div class="achievement-name">${a.name}</div>
+      <div class="achievement-desc">${a.desc}</div>
+      ${a.pickles>0?`<div class="achievement-pickles">+${a.pickles} 🥒</div>`:''}
+    </div>
+  `).join('');
+}
+async function unlockAchievement(id) {
+  if(unlockedAchievements.has(id))return;
+  unlockedAchievements.add(id);
+  const ach=ACHIEVEMENTS.find(a=>a.id===id); if(!ach)return;
+  await db.from('achievements').insert([{user_id:user.id,achievement_id:id,pickles:ach.pickles}]);
+  pickleCount+=ach.pickles;
+  document.getElementById('pickle-count').textContent=pickleCount;
+  showToast(ach.icon,'Achievement Unlocked!',`${ach.name} — +${ach.pickles} 🥒 pickles`);
+  renderAchievements();
+}
+function checkModeAchievement(mode){ modesUsed.add(mode); if(modesUsed.size>=3) unlockAchievement('all_modes'); }
+
+async function awardPickles(amount, msg) {
+  pickleCount+=amount;
+  document.getElementById('pickle-count').textContent=pickleCount;
+  if(pickleCount>=100) unlockAchievement('hundred_pickles');
+}
+
+// ---- TOAST ----
+let toastTimeout;
+function showToast(icon, title, msg) {
+  const toast=document.getElementById('pickle-toast');
+  document.getElementById('toast-icon').textContent=icon;
+  document.getElementById('toast-title').textContent=title;
+  document.getElementById('toast-msg').textContent=msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout=setTimeout(()=>toast.classList.remove('show'),3500);
+}
+
+// ---- UTILS ----
+function fmtTime(s){const p=n=>String(n).padStart(2,'0');return p(Math.floor(s/3600))+':'+p(Math.floor(s%3600/60))+':'+p(s%60);}
+function fmtDur(s){const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h>0?h+'h '+m+'m':m+'m '+Math.floor(s%60)+'s';}
+function esc(str){return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ---- INIT ----
+spawnPickles();
+(async()=>{
+  const {data}=await db.auth.getSession();
+  if(data?.session?.user){ user=data.session.user; showApp(); }
+})();
+</script>
+</body>
+</html>
